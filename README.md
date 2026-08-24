@@ -1,6 +1,9 @@
 # StockPulse – Real-Time Stock Screener 📈⚡
 
+> 🌐 **Live Production Deployment**: [https://stock-pulse-real-time-stock-screene.vercel.app/](https://stock-pulse-real-time-stock-screene.vercel.app/)
+
 **StockPulse** is a production-grade, high-performance financial stock screener and technical analysis terminal built using **Next.js 14 (App Router)**, **React 18**, **TypeScript**, **Tailwind CSS**, **Zustand**, **TanStack Table & Virtual**, and **TradingView Lightweight Charts**.
+
 
 Designed for speed and scalability, StockPulse simulates live WebSocket market feeds across **5,000+ stock records** with real-time price flashing, sub-200ms multi-criteria filtering, DOM virtualization, technical indicators, watchlist bookmarking, target price alerts, and URL filter synchronization.
 

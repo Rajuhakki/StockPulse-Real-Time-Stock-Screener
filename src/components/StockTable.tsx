@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,10 +12,60 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStockStore } from '../store/useStockStore';
 import { Stock } from '../types';
-import { ArrowUpDown, ArrowUp, ArrowDown, Layers, AlertCircle } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Layers, AlertCircle, Radio } from 'lucide-react';
+
+/**
+ * Animated Price Cell Component that flashes green/red on price update
+ */
+const PriceCell: React.FC<{ symbol: string; price: number }> = React.memo(({ symbol, price }) => {
+  const priceChanges = useStockStore((state) => state.priceChanges[symbol]);
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
+
+  useEffect(() => {
+    if (!priceChanges) return;
+
+    // Flash for 1.2 seconds after price change
+    const isRecent = Date.now() - priceChanges.timestamp < 1200;
+    if (isRecent) {
+      setFlash(priceChanges.direction);
+      const timer = setTimeout(() => {
+        setFlash(null);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [priceChanges, price]);
+
+  const formattedPrice = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price);
+
+  let bgClass = 'text-slate-100 bg-transparent';
+  if (flash === 'up') {
+    bgClass = 'text-emerald-400 bg-emerald-500/20 ring-1 ring-emerald-500/50 shadow-sm shadow-emerald-500/30';
+  } else if (flash === 'down') {
+    bgClass = 'text-rose-400 bg-rose-500/20 ring-1 ring-rose-500/50 shadow-sm shadow-rose-500/30';
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1.5 font-mono">
+      <span
+        className={`px-2 py-0.5 rounded transition-all duration-300 font-medium ${bgClass}`}
+      >
+        {formattedPrice}
+      </span>
+      {flash === 'up' && <ArrowUp className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />}
+      {flash === 'down' && <ArrowDown className="w-3.5 h-3.5 text-rose-400 animate-bounce" />}
+    </div>
+  );
+});
+
+PriceCell.displayName = 'PriceCell';
 
 export const StockTable: React.FC = React.memo(() => {
-  const { filtered } = useStockStore();
+  const { filtered, selectedStock, setSelectedStock } = useStockStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -34,19 +84,12 @@ export const StockTable: React.FC = React.memo(() => {
       {
         accessorKey: 'price',
         header: 'Price',
-        cell: (info) => {
-          const val = info.getValue<number>();
-          return (
-            <span className="font-medium text-slate-100 font-mono">
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }).format(val)}
-            </span>
-          );
-        },
+        cell: (info) => (
+          <PriceCell
+            symbol={info.row.original.symbol}
+            price={info.getValue<number>()}
+          />
+        ),
       },
       {
         accessorKey: 'volume',
@@ -108,15 +151,21 @@ export const StockTable: React.FC = React.memo(() => {
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-emerald-400" />
           <span className="text-sm font-medium text-slate-200">
-            Virtualized Stock Table
+            Real-Time Screener Table
           </span>
           <span className="text-xs text-slate-400">
-            ({rows.length.toLocaleString()} records rendered smoothly via virtual scrolling)
+            (Click row to view technical chart)
           </span>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-          DOM Nodes: {virtualItems.length} visible
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-medium">
+            <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+            Live WS
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+            {rows.length.toLocaleString()} matches
+          </span>
+        </div>
       </div>
 
       {/* Virtualized Scrollable Table Container */}
@@ -180,10 +229,17 @@ export const StockTable: React.FC = React.memo(() => {
             {rows.length > 0 ? (
               virtualItems.map((virtualRow) => {
                 const row = rows[virtualRow.index];
+                const isSelected = selectedStock?.symbol === row.original.symbol;
+
                 return (
                   <tr
                     key={row.id}
-                    className="hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 group"
+                    onClick={() => setSelectedStock(row.original)}
+                    className={`cursor-pointer transition-colors border-b border-slate-800/50 group ${
+                      isSelected
+                        ? 'bg-emerald-500/10 border-emerald-500/30 font-medium'
+                        : 'hover:bg-slate-800/50'
+                    }`}
                     style={{ height: `${virtualRow.size}px` }}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -214,7 +270,7 @@ export const StockTable: React.FC = React.memo(() => {
                       No stocks match your filter criteria
                     </p>
                     <p className="text-xs text-slate-500">
-                      Adjust or reset your filter constraints to see more records.
+                      Adjust or reset your filter constraints to see stock details.
                     </p>
                   </div>
                 </td>
@@ -239,9 +295,9 @@ export const StockTable: React.FC = React.memo(() => {
 
       {/* Table Footer */}
       <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-        <span>Click column headers to sort</span>
+        <span>Click any row to view chart</span>
         <span>
-          Showing {rows.length.toLocaleString()} of {filtered.length.toLocaleString()} matching
+          Selected: <strong className="text-emerald-400 font-semibold">{selectedStock?.symbol || 'None'}</strong>
         </span>
       </div>
     </div>

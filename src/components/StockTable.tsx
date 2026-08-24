@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStockStore } from '../store/useStockStore';
+import { useIsMounted } from '../hooks/useIsMounted';
 import { Stock } from '../types';
 import { ArrowUpDown, ArrowUp, ArrowDown, Layers, AlertCircle, Radio, Star } from 'lucide-react';
 
@@ -65,8 +66,9 @@ PriceCell.displayName = 'PriceCell';
  * Watchlist Star Toggle Cell
  */
 const WatchlistCell: React.FC<{ symbol: string }> = React.memo(({ symbol }) => {
+  const isMounted = useIsMounted();
   const { watchlist, toggleWatchlist } = useStockStore();
-  const isStarred = watchlist.includes(symbol);
+  const isStarred = isMounted && watchlist.includes(symbol);
 
   return (
     <button
@@ -90,6 +92,7 @@ const WatchlistCell: React.FC<{ symbol: string }> = React.memo(({ symbol }) => {
 WatchlistCell.displayName = 'WatchlistCell';
 
 export const StockTable: React.FC = React.memo(() => {
+  const isMounted = useIsMounted();
   const { filtered, selectedStock, setSelectedStock } = useStockStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -265,7 +268,7 @@ export const StockTable: React.FC = React.memo(() => {
             {rows.length > 0 ? (
               virtualItems.map((virtualRow) => {
                 const row = rows[virtualRow.index];
-                const isSelected = selectedStock?.symbol === row.original.symbol;
+                const isSelected = isMounted && selectedStock?.symbol === row.original.symbol;
 
                 return (
                   <tr
@@ -328,7 +331,7 @@ export const StockTable: React.FC = React.memo(() => {
       <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
         <span>Click ⭐ to add stock to watchlist</span>
         <span>
-          Selected: <strong className="text-emerald-400 font-semibold">{selectedStock?.symbol || 'None'}</strong>
+          Selected: <strong className="text-emerald-400 font-semibold">{isMounted ? selectedStock?.symbol || 'None' : '...'}</strong>
         </span>
       </div>
     </div>

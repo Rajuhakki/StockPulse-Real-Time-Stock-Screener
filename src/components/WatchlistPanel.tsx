@@ -2,14 +2,17 @@
 
 import React from 'react';
 import { useStockStore } from '../store/useStockStore';
+import { useIsMounted } from '../hooks/useIsMounted';
 import { Star, Trash2, TrendingUp, AlertCircle } from 'lucide-react';
 
 export const WatchlistPanel: React.FC = React.memo(() => {
+  const isMounted = useIsMounted();
   const { stocks, watchlist, toggleWatchlist, setSelectedStock, selectedStock, priceChanges } =
     useStockStore();
 
-  // Find stock objects for symbols in watchlist
-  const watchlistStocks = stocks.filter((s) => watchlist.includes(s.symbol));
+  const watchlistStocks = isMounted
+    ? stocks.filter((s) => watchlist.includes(s.symbol))
+    : [];
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl shadow-xl overflow-hidden mb-6">
@@ -20,13 +23,17 @@ export const WatchlistPanel: React.FC = React.memo(() => {
           <h2 className="text-sm font-semibold text-slate-100">Favorite Watchlist</h2>
         </div>
         <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-          {watchlistStocks.length} saved
+          {isMounted ? watchlistStocks.length : 0} saved
         </span>
       </div>
 
       {/* List Container */}
       <div className="p-3 max-h-[320px] overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-        {watchlistStocks.length > 0 ? (
+        {!isMounted ? (
+          <div className="py-8 text-center text-slate-500 flex flex-col items-center justify-center gap-1.5">
+            <p className="text-xs text-slate-500">Loading watchlist...</p>
+          </div>
+        ) : watchlistStocks.length > 0 ? (
           watchlistStocks.map((stock) => {
             const isSelected = selectedStock?.symbol === stock.symbol;
             const priceInfo = priceChanges[stock.symbol];

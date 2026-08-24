@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useIsMounted } from '../hooks/useIsMounted';
 import { User, Mail, ShieldCheck, Award, Calendar, Camera } from 'lucide-react';
 
 export interface UserProfileData {
@@ -22,6 +23,7 @@ const DEFAULT_PROFILE: UserProfileData = {
 };
 
 export const ProfileCard: React.FC = () => {
+  const isMounted = useIsMounted();
   const [profile, setProfile] = useState<UserProfileData>(DEFAULT_PROFILE);
 
   useEffect(() => {
@@ -34,6 +36,14 @@ export const ProfileCard: React.FC = () => {
       // fallback to default
     }
   }, []);
+
+  if (!isMounted) {
+    return (
+      <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-6 shadow-xl text-slate-100 animate-pulse">
+        <div className="h-20 bg-slate-800 rounded-lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-6 shadow-xl text-slate-100">

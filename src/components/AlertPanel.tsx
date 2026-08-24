@@ -3,9 +3,11 @@
 import React, { useState } from 'react';
 import { useAlertStore } from '../store/useAlertStore';
 import { useStockStore } from '../store/useStockStore';
+import { useIsMounted } from '../hooks/useIsMounted';
 import { Bell, Plus, Trash2, CheckCircle2, DollarSign } from 'lucide-react';
 
 export const AlertPanel: React.FC = React.memo(() => {
+  const isMounted = useIsMounted();
   const selectedStock = useStockStore((state) => state.selectedStock);
   const { alerts, addAlert, removeAlert, clearTriggeredAlerts } = useAlertStore();
 
@@ -35,7 +37,8 @@ export const AlertPanel: React.FC = React.memo(() => {
     });
   };
 
-  const triggeredCount = alerts.filter((a) => a.triggered).length;
+  const activeAlerts = isMounted ? alerts : [];
+  const triggeredCount = activeAlerts.filter((a) => a.triggered).length;
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl shadow-xl overflow-hidden mb-6">
@@ -112,8 +115,10 @@ export const AlertPanel: React.FC = React.memo(() => {
 
       {/* Alerts List */}
       <div className="p-3 max-h-[220px] overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-        {alerts.length > 0 ? (
-          alerts.map((alert) => (
+        {!isMounted ? (
+          <div className="py-6 text-center text-slate-500 text-xs">Loading alerts...</div>
+        ) : activeAlerts.length > 0 ? (
+          activeAlerts.map((alert) => (
             <div
               key={alert.id}
               className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${

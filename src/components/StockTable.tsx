@@ -12,7 +12,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStockStore } from '../store/useStockStore';
 import { Stock } from '../types';
-import { ArrowUpDown, ArrowUp, ArrowDown, Layers, AlertCircle, Radio } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Layers, AlertCircle, Radio, Star } from 'lucide-react';
 
 /**
  * Animated Price Cell Component that flashes green/red on price update
@@ -24,7 +24,6 @@ const PriceCell: React.FC<{ symbol: string; price: number }> = React.memo(({ sym
   useEffect(() => {
     if (!priceChanges) return;
 
-    // Flash for 1.2 seconds after price change
     const isRecent = Date.now() - priceChanges.timestamp < 1200;
     if (isRecent) {
       setFlash(priceChanges.direction);
@@ -51,9 +50,7 @@ const PriceCell: React.FC<{ symbol: string; price: number }> = React.memo(({ sym
 
   return (
     <div className="flex items-center justify-end gap-1.5 font-mono">
-      <span
-        className={`px-2 py-0.5 rounded transition-all duration-300 font-medium ${bgClass}`}
-      >
+      <span className={`px-2 py-0.5 rounded transition-all duration-300 font-medium ${bgClass}`}>
         {formattedPrice}
       </span>
       {flash === 'up' && <ArrowUp className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />}
@@ -64,6 +61,34 @@ const PriceCell: React.FC<{ symbol: string; price: number }> = React.memo(({ sym
 
 PriceCell.displayName = 'PriceCell';
 
+/**
+ * Watchlist Star Toggle Cell
+ */
+const WatchlistCell: React.FC<{ symbol: string }> = React.memo(({ symbol }) => {
+  const { watchlist, toggleWatchlist } = useStockStore();
+  const isStarred = watchlist.includes(symbol);
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleWatchlist(symbol);
+      }}
+      title={isStarred ? 'Remove from Watchlist' : 'Add to Watchlist'}
+      className="p-1 text-slate-500 hover:text-amber-400 transition-colors cursor-pointer"
+    >
+      <Star
+        className={`w-4 h-4 transition-all ${
+          isStarred ? 'fill-amber-400 text-amber-400 scale-110' : 'text-slate-600 hover:text-amber-300'
+        }`}
+      />
+    </button>
+  );
+});
+
+WatchlistCell.displayName = 'WatchlistCell';
+
 export const StockTable: React.FC = React.memo(() => {
   const { filtered, selectedStock, setSelectedStock } = useStockStore();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -72,6 +97,11 @@ export const StockTable: React.FC = React.memo(() => {
   // Column definitions using TanStack Table
   const columns = useMemo<ColumnDef<Stock>[]>(
     () => [
+      {
+        id: 'watchlist',
+        header: 'Fav',
+        cell: (info) => <WatchlistCell symbol={info.row.original.symbol} />,
+      },
       {
         accessorKey: 'symbol',
         header: 'Symbol',
@@ -85,10 +115,7 @@ export const StockTable: React.FC = React.memo(() => {
         accessorKey: 'price',
         header: 'Price',
         cell: (info) => (
-          <PriceCell
-            symbol={info.row.original.symbol}
-            price={info.getValue<number>()}
-          />
+          <PriceCell symbol={info.row.original.symbol} price={info.getValue<number>()} />
         ),
       },
       {
@@ -154,7 +181,7 @@ export const StockTable: React.FC = React.memo(() => {
             Real-Time Screener Table
           </span>
           <span className="text-xs text-slate-400">
-            (Click row to view technical chart)
+            (Click row to view chart • ⭐ to bookmark)
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -180,18 +207,26 @@ export const StockTable: React.FC = React.memo(() => {
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   const isSorted = header.column.getIsSorted();
+                  const isWatchlistCol = header.id === 'watchlist';
+
                   return (
                     <th
                       key={header.id}
                       scope="col"
-                      onClick={header.column.getToggleSortingHandler()}
-                      className={`py-3.5 px-6 select-none cursor-pointer hover:bg-slate-800/60 transition-colors ${
-                        header.id !== 'symbol' ? 'text-right' : ''
+                      onClick={
+                        !isWatchlistCol
+                          ? header.column.getToggleSortingHandler()
+                          : undefined
+                      }
+                      className={`py-3.5 px-6 select-none ${
+                        !isWatchlistCol ? 'cursor-pointer hover:bg-slate-800/60' : ''
+                      } transition-colors ${
+                        header.id !== 'symbol' && !isWatchlistCol ? 'text-right' : ''
                       }`}
                     >
                       <div
                         className={`inline-flex items-center gap-1.5 ${
-                          header.id !== 'symbol' ? 'flex-row-reverse' : ''
+                          header.id !== 'symbol' && !isWatchlistCol ? 'flex-row-reverse' : ''
                         }`}
                       >
                         <span>
@@ -200,15 +235,17 @@ export const StockTable: React.FC = React.memo(() => {
                             header.getContext()
                           )}
                         </span>
-                        <span className="text-slate-500">
-                          {isSorted === 'asc' ? (
-                            <ArrowUp className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : isSorted === 'desc' ? (
-                            <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <ArrowUpDown className="w-3.5 h-3.5 opacity-40 hover:opacity-100" />
-                          )}
-                        </span>
+                        {!isWatchlistCol && (
+                          <span className="text-slate-500">
+                            {isSorted === 'asc' ? (
+                              <ArrowUp className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : isSorted === 'desc' ? (
+                              <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <ArrowUpDown className="w-3.5 h-3.5 opacity-40 hover:opacity-100" />
+                            )}
+                          </span>
+                        )}
                       </div>
                     </th>
                   );
@@ -220,7 +257,6 @@ export const StockTable: React.FC = React.memo(() => {
           {/* Table Body with Virtualization */}
           <tbody>
             {rows.length > 0 ? (
-              // Spacer top for virtualization window
               <tr style={{ height: `${virtualItems[0]?.start ?? 0}px` }}>
                 <td colSpan={columns.length} />
               </tr>
@@ -246,13 +282,12 @@ export const StockTable: React.FC = React.memo(() => {
                       <td
                         key={cell.id}
                         className={`py-3 px-6 ${
-                          cell.column.id !== 'symbol' ? 'text-right' : ''
+                          cell.column.id !== 'symbol' && cell.column.id !== 'watchlist'
+                            ? 'text-right'
+                            : ''
                         }`}
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
@@ -260,10 +295,7 @@ export const StockTable: React.FC = React.memo(() => {
               })
             ) : (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="py-16 px-6 text-center text-slate-400"
-                >
+                <td colSpan={columns.length} className="py-16 px-6 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="w-8 h-8 text-slate-500" />
                     <p className="text-base font-medium text-slate-300">
@@ -278,7 +310,6 @@ export const StockTable: React.FC = React.memo(() => {
             )}
 
             {rows.length > 0 ? (
-              // Spacer bottom for virtualization window
               <tr
                 style={{
                   height: `${
@@ -295,7 +326,7 @@ export const StockTable: React.FC = React.memo(() => {
 
       {/* Table Footer */}
       <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-        <span>Click any row to view chart</span>
+        <span>Click ⭐ to add stock to watchlist</span>
         <span>
           Selected: <strong className="text-emerald-400 font-semibold">{selectedStock?.symbol || 'None'}</strong>
         </span>

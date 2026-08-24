@@ -28,11 +28,14 @@ interface StockStore {
   filters: StockFilters;
   priceChanges: Record<string, PriceChangeInfo>;
   selectedStock: Stock | null;
+  watchlist: string[];
 
   setFilters: (newFilters: Partial<StockFilters>) => void;
   resetFilters: () => void;
   updateStockPrices: (updates: PriceUpdate[]) => void;
   setSelectedStock: (stock: Stock | null) => void;
+  toggleWatchlist: (symbol: string) => void;
+  isInWatchlist: (symbol: string) => boolean;
 }
 
 /**
@@ -50,18 +53,61 @@ function applyFilters(stocks: Stock[], filters: StockFilters): Stock[] {
   });
 }
 
-export const useStockStore = create<StockStore>((set) => ({
+/**
+ * Helper to safely read initial watchlist from localStorage
+ */
+function getInitialWatchlist(): string[] {
+  if (typeof window === 'undefined') return ['AAPL', 'NVDA', 'MSFT', 'TSLA'];
+  try {
+    const saved = localStorage.getItem('stockpulse_watchlist');
+    return saved ? JSON.parse(saved) : ['AAPL', 'NVDA', 'MSFT', 'TSLA'];
+  } catch {
+    return ['AAPL', 'NVDA', 'MSFT', 'TSLA'];
+  }
+}
+
+export const useStockStore = create<StockStore>((set, get) => ({
   stocks: STOCKS,
   filtered: STOCKS,
   filters: DEFAULT_FILTERS,
   priceChanges: {},
-  selectedStock: STOCKS[0] || null, // Default to first stock (AAPL)
+  selectedStock: STOCKS[0] || null,
+  watchlist: getInitialWatchlist(),
 
   /**
    * Selects a stock to display in the technical chart panel
    */
   setSelectedStock: (stock: Stock | null) => {
     set({ selectedStock: stock });
+  },
+
+  /**
+   * Toggles a stock symbol in the watchlist and persists to localStorage
+   */
+  toggleWatchlist: (symbol: string) => {
+    set((state) => {
+      const exists = state.watchlist.includes(symbol);
+      const nextWatchlist = exists
+        ? state.watchlist.filter((s) => s !== symbol)
+        : [...state.watchlist, symbol];
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('stockpulse_watchlist', JSON.stringify(nextWatchlist));
+        } catch (e) {
+          console.error('Failed to save watchlist to localStorage', e);
+        }
+      }
+
+      return { watchlist: nextWatchlist };
+    });
+  },
+
+  /**
+   * Checks if a symbol is in the current watchlist
+   */
+  isInWatchlist: (symbol: string) => {
+    return get().watchlist.includes(symbol);
   },
 
   /**
@@ -74,8 +120,7 @@ export const useStockStore = create<StockStore>((set) => ({
         ...newFilters,
       };
       const filtered = applyFilters(state.stocks, updatedFilters);
-      
-      // Preserve or adjust selected stock
+
       let nextSelected = state.selectedStock;
       if (nextSelected && !filtered.some((s) => s.symbol === nextSelected?.symbol)) {
         nextSelected = filtered[0] || null;
@@ -116,7 +161,6 @@ export const useStockStore = create<StockStore>((set) => ({
         };
       });
 
-      // Update full stocks array immutably for updated items
       const nextStocks = state.stocks.map((stock) => {
         const u = updateMap.get(stock.symbol);
         if (u) {
@@ -128,10 +172,8 @@ export const useStockStore = create<StockStore>((set) => ({
         return stock;
       });
 
-      // Re-apply filters efficiently to produce updated filtered array
       const nextFiltered = applyFilters(nextStocks, state.filters);
 
-      // Update selected stock price if it was updated
       let nextSelected = state.selectedStock;
       if (nextSelected) {
         const selUpdate = updateMap.get(nextSelected.symbol);
